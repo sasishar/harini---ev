@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charge Log — EV Charger Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0F1319;
+    --panel: #171D26;
+    --panel-2: #1D2530;
+    --line: #2A3341;
+    --amber: #F5A623;
+    --amber-dim: #8A5E1C;
+    --green: #4ADE80;
+    --red: #F87171;
+    --text: #E8EAED;
+    --text-dim: #8B93A1;
+    --text-faint: #58626F;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height:100vh;
+  }
+  body{
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(245,166,35,0.06), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(74,222,128,0.05), transparent 40%);
+  }
+  .wrap{
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:20px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 32px;
+    letter-spacing: -0.01em;
+  }
+  .station-id{
+    font-family:'IBM Plex Mono', monospace;
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top:6px;
+  }
+  .status-pill{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding: 10px 16px;
+    border-radius: 100px;
+    border:1px solid var(--line);
+    background: var(--panel);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight:600;
+    letter-spacing: 0.04em;
+  }
+  .dot{
+    width:9px; height:9px; border-radius:50%;
+    background: var(--text-faint);
+  }
+  .status-pill.charging .dot{
+    background: var(--green);
+    box-shadow: 0 0 0 0 rgba(74,222,128,0.6);
+    animation: pulse 1.4s infinite;
+  }
+  .status-pill.charging{ color: var(--green); border-color: rgba(74,222,128,0.3); }
+  .status-pill.done .dot{ background: var(--amber); }
+  .status-pill.done{ color: var(--amber); border-color: rgba(245,166,35,0.3); }
+  @keyframes pulse{
+    0%{ box-shadow: 0 0 0 0 rgba(74,222,128,0.55); }
+    70%{ box-shadow: 0 0 0 9px rgba(74,222,128,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(74,222,128,0); }
+  }
+
+  /* ---------- Hero: gauge + controls ---------- */
+  .hero{
+    display:grid;
+    grid-template-columns: 260px 1fr;
+    gap: 32px;
+    align-items:center;
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 28px;
+  }
+  .gauge-box{ position:relative; width:220px; height:220px; margin: 0 auto;}
+  .gauge-value{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .gauge-value .num{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 34px; font-weight:600;
+    color: var(--amber);
+    font-variant-numeric: tabular-nums;
+  }
+  .gauge-value .unit{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px; color: var(--text-dim); letter-spacing: 0.08em; margin-top:2px;
+  }
+  .gauge-value .label{
+    font-size: 11px; color: var(--text-faint); text-transform:uppercase; letter-spacing:0.1em; margin-top:10px;
+  }
+
+  .hero-right h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+  .hero-right p{
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    max-width: 440px;
+  }
+  .controls{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  button{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 12px 22px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text);
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  button.primary{
+    background: var(--amber);
+    color: #17130A;
+    border-color: var(--amber);
+  }
+  button.primary:hover{ filter: brightness(1.08); }
+  button.ghost:hover{ border-color: var(--amber); color: var(--amber); }
+  button:disabled{ opacity:0.4; cursor:not-allowed; }
+
+  .speed-note{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 14px;
+  }
+  .speed-note b{ color: var(--text-dim); }
+
+  /* ---------- Metric grid ---------- */
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .card{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .card .k{
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .card .v{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .card .v span.unit{
+    font-size: 14px;
+    color: var(--text-dim);
+    font-weight: 500;
+    margin-left: 4px;
+  }
+  .card .f{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--amber-dim);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+    line-height: 1.5;
+  }
+  .card .f b{ color: var(--amber); font-weight:600; }
+  .card.accent2 .f b{ color: var(--green); }
+  .card.accent .v{ color: var(--amber); }
+  .card.accent2 .v{ color: var(--green); }
+
+  /* ---------- Log ---------- */
+  .log-section{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .log-head{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 20px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .log-head h3{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 16px;
+  }
+  .log-head span{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  .table-scroll{ max-height: 340px; overflow-y:auto; }
+  table{ width:100%; border-collapse: collapse; font-family:'IBM Plex Mono', monospace; font-size:12.5px;}
+  thead th{
+    position: sticky; top:0;
+    background: var(--panel-2);
+    text-align:left;
+    padding: 10px 14px;
+    color: var(--text-faint);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 10.5px;
+    border-bottom: 1px solid var(--line);
+  }
+  tbody td{
+    padding: 9px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  tbody tr:last-child td{ color: var(--text); }
+  tbody tr.new-row{ animation: rowIn .5s ease; }
+  @keyframes rowIn{ from{ background: rgba(245,166,35,0.14);} to{ background: transparent; } }
+  .status-cell.charging{ color: var(--green); }
+  .status-cell.idle{ color: var(--text-faint); }
+  .status-cell.done{ color: var(--amber); }
+  .empty-log{
+    padding: 40px 20px;
+    text-align:center;
+    color: var(--text-faint);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  /* ---------- Formulas ---------- */
+  .formula-section{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px 26px 8px;
+    margin-top: 22px;
+  }
+  .formula-section h3{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+  .formula-section > p{
+    color: var(--text-faint);
+    font-size: 12.5px;
+    margin-bottom: 20px;
+  }
+  .formula-grid{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .formula-card{
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .formula-card .fname{
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .formula-card .fexpr{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 15px;
+    color: var(--amber);
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  .formula-card .fdesc{
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .formula-card .fdesc code{
+    font-family:'IBM Plex Mono', monospace;
+    color: var(--green);
+    font-size: 11.5px;
+  }
+
+  footer{
+    margin-top: 22px;
+    text-align:center;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  @media (max-width: 640px){
+    .hero{ grid-template-columns: 1fr; }
+    .grid{ grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="eyebrow">Home charge point · 3.3 kW AC</div>
+      <h1>Charge Log</h1>
+      <div class="station-id">Unit ID: EVC-0142 &nbsp;·&nbsp; Tariff ₹8.00 / kWh</div>
+    </div>
+    <div class="status-pill idle" id="statusPill">
+      <div class="dot"></div>
+      <span id="statusText">Not Charging</span>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="gauge-box">
+      <svg viewBox="0 0 220 220" width="220" height="220">
+        <circle cx="110" cy="110" r="94" fill="none" stroke="#2A3341" stroke-width="14"/>
+        <circle id="gaugeArc" cx="110" cy="110" r="94" fill="none" stroke="#F5A623" stroke-width="14"
+          stroke-linecap="round" stroke-dasharray="590.6" stroke-dashoffset="590.6"
+          transform="rotate(-90 110 110)" style="transition: stroke-dashoffset .5s ease, stroke .3s ease;"/>
+      </svg>
+      <div class="gauge-value">
+        <div class="num" id="gaugePower">0.00</div>
+        <div class="unit">kW draw</div>
+        <div class="label">Instant Power</div>
+      </div>
+    </div>
+
+    <div class="hero-right">
+      <h2>Simulated charging session</h2>
+      <p>Press start to run a full charge cycle. To make a real ~30&nbsp;minute session watchable, 1 real second here represents 1 simulated minute — the log fills in as if half an hour of charging had actually elapsed.</p>
+      <div class="controls">
+        <button class="primary" id="startBtn">Start Charging</button>
+        <button class="ghost" id="stopBtn" disabled>Stop</button>
+        <button class="ghost" id="resetBtn">Reset</button>
+      </div>
+      <div class="speed-note">Simulated speed: <b>1s real ≈ 1 min charging</b> &nbsp;|&nbsp; Full session ≈ <b>30 simulated minutes</b></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <div class="k">Voltage</div>
+      <div class="v" id="mVoltage">0<span class="unit">V</span></div>
+      <div class="f"><b>V</b> = nominal 230V ± ripple</div>
+    </div>
+    <div class="card">
+      <div class="k">Current</div>
+      <div class="v" id="mCurrent">0.00<span class="unit">A</span></div>
+      <div class="f">Ramp: <b>I = I_max × (t÷2)</b><br>Taper: <b>I = I_max × (1−t′)</b></div>
+    </div>
+    <div class="card accent">
+      <div class="k">Power</div>
+      <div class="v" id="mPower">0.00<span class="unit">kW</span></div>
+      <div class="f"><b>P = (V × I) ÷ 1000</b></div>
+    </div>
+    <div class="card accent2">
+      <div class="k">Energy Consumed</div>
+      <div class="v" id="mEnergy">0.000<span class="unit">kWh</span></div>
+      <div class="f"><b>E = Σ P × Δt</b>, Δt = 1/60 hr</div>
+    </div>
+    <div class="card">
+      <div class="k">Charging Time</div>
+      <div class="v" id="mTime">00:00</div>
+      <div class="f"><b>T = HH:MM</b>, HH=⌊min÷60⌋, MM=min mod 60</div>
+    </div>
+    <div class="card accent">
+      <div class="k">Cost</div>
+      <div class="v" id="mCost">₹0.00</div>
+      <div class="f"><b>Cost = E × ₹8.00/kWh</b></div>
+    </div>
+  </section>
+
+  <section class="log-section">
+    <div class="log-head">
+      <h3>Recorded readings</h3>
+      <span id="logMeta">0 entries</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Status</th>
+            <th>Voltage</th>
+            <th>Current</th>
+            <th>Power</th>
+            <th>Energy</th>
+            <th>Cost</th>
+          </tr>
+        </thead>
+        <tbody id="logBody">
+          <tr><td colspan="7" class="empty-log">No readings yet — start a session to begin recording.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Values are simulated for demonstration and follow a typical CC–CV home AC charging curve.</footer>
+</div>
+
+<script>
+  const RATE_PER_KWH = 8.0;       // ₹ per kWh
+  const NOMINAL_V = 230;           // AC single phase
+  const MAX_CURRENT = 16;          // amps, typical home AC charger
+  const TOTAL_MIN = 30;            // simulated session length in minutes
+  const TICK_MS = 1000;            // 1 real second = 1 simulated minute
+
+  let simMinute = 0;
+  let energyKWh = 0;
+  let timer = null;
+  let logRows = [];
+
+  const el = id => document.getElementById(id);
+  const gaugeArc = el('gaugeArc');
+  const CIRC = 590.6;
+
+  function fmtTime(mins){
+    const h = Math.floor(mins/60).toString().padStart(2,'0');
+    const m = Math.floor(mins%60).toString().padStart(2,'0');
+    return `${h}:${m}`;
+  }
+
+  // CC-CV-like curve: ramp up 0-2min, hold steady 2-22min, taper 22-30min
+  function currentForMinute(min){
+    if(min <= 2) return MAX_CURRENT * (min/2);
+    if(min <= 22) return MAX_CURRENT * (0.97 + Math.random()*0.03);
+    const t = (min-22)/8; // 0..1 taper window
+    return Math.max(0.4, MAX_CURRENT * (1 - t) * (0.97 + Math.random()*0.06));
+  }
+
+  function voltageForMinute(){
+    return NOMINAL_V + (Math.random()*4 - 2); // small ripple
+  }
+
+  function setGauge(powerKW){
+    const pct = Math.min(powerKW / 3.7, 1);
+    gaugeArc.style.strokeDashoffset = CIRC - (CIRC * pct);
+    const hue = powerKW < 0.1 ? '#3A4453' : '#F5A623';
+    gaugeArc.style.stroke = hue;
+  }
+
+  function setStatusPill(state){
+    const pill = el('statusPill');
+    const text = el('statusText');
+    pill.className = 'status-pill ' + state;
+    if(state === 'charging'){ text.textContent = 'Charging'; }
+    else if(state === 'done'){ text.textContent = 'Charge Complete'; }
+    else { text.textContent = 'Not Charging'; }
+  }
+
+  function addLogRow(min, status, v, i, p, cumEnergy, cost){
+    if(logRows.length === 0){ el('logBody').innerHTML = ''; }
+    const tr = document.createElement('tr');
+    tr.className = 'new-row';
+    tr.innerHTML = `
+      <td>${fmtTime(min)}</td>
+      <td class="status-cell ${status==='Charging'?'charging':(status==='Complete'?'done':'idle')}">${status}</td>
+      <td>${v.toFixed(1)} V</td>
+      <td>${i.toFixed(2)} A</td>
+      <td>${p.toFixed(2)} kW</td>
+      <td>${cumEnergy.toFixed(3)} kWh</td>
+      <td>₹${cost.toFixed(2)}</td>
+    `;
+    el('logBody').appendChild(tr);
+    logRows.push(tr);
+    el('logMeta').textContent = `${logRows.length} entr${logRows.length===1?'y':'ies'}`;
+    const scroller = document.querySelector('.table-scroll');
+    scroller.scrollTop = scroller.scrollHeight;
+  }
+
+  function updateLiveMetrics(v, i, p, status){
+    el('mVoltage').innerHTML = `${v.toFixed(0)}<span class="unit">V</span>`;
+    el('mCurrent').innerHTML = `${i.toFixed(2)}<span class="unit">A</span>`;
+    el('mPower').innerHTML = `${p.toFixed(2)}<span class="unit">kW</span>`;
+    el('mEnergy').innerHTML = `${energyKWh.toFixed(3)}<span class="unit">kWh</span>`;
+    el('mTime').textContent = fmtTime(simMinute);
+    el('mCost').textContent = `₹${(energyKWh*RATE_PER_KWH).toFixed(2)}`;
+    el('gaugePower').textContent = p.toFixed(2);
+    setGauge(p);
+  }
+
+  function tick(){
+    simMinute += 1;
+    const v = voltageForMinute();
+    const i = currentForMinute(simMinute);
+    const p = (v * i) / 1000; // kW
+    energyKWh += p * (1/60);  // 1 simulated minute of energy
+
+    const status = simMinute >= TOTAL_MIN ? 'Complete' : 'Charging';
+    updateLiveMetrics(v, i, p, status);
+    addLogRow(simMinute, status, v, i, p, energyKWh, energyKWh*RATE_PER_KWH);
+
+    if(simMinute >= TOTAL_MIN){
+      stopSession(true);
+    }
+  }
+
+  function startSession(){
+    if(timer) return;
+    setStatusPill('charging');
+    el('startBtn').disabled = true;
+    el('stopBtn').disabled = false;
+    timer = setInterval(tick, TICK_MS);
+  }
+
+  function stopSession(completed){
+    clearInterval(timer);
+    timer = null;
+    el('startBtn').disabled = completed ? true : false;
+    el('stopBtn').disabled = true;
+    setStatusPill(completed ? 'done' : 'idle');
+  }
+
+  function resetSession(){
+    clearInterval(timer);
+    timer = null;
+    simMinute = 0;
+    energyKWh = 0;
+    logRows = [];
+    el('logBody').innerHTML = '<tr><td colspan="7" class="empty-log">No readings yet — start a session to begin recording.</td></tr>';
+    el('logMeta').textContent = '0 entries';
+    updateLiveMetrics(0,0,0,'Idle');
+    el('mVoltage').innerHTML = `0<span class="unit">V</span>`;
+    el('mCurrent').innerHTML = `0.00<span class="unit">A</span>`;
+    el('mPower').innerHTML = `0.00<span class="unit">kW</span>`;
+    el('mEnergy').innerHTML = `0.000<span class="unit">kWh</span>`;
+    el('mTime').textContent = '00:00';
+    el('mCost').textContent = '₹0.00';
+    el('gaugePower').textContent = '0.00';
+    setGauge(0);
+    setStatusPill('idle');
+    el('startBtn').disabled = false;
+    el('stopBtn').disabled = true;
+  }
+
+  el('startBtn').addEventListener('click', startSession);
+  el('stopBtn').addEventListener('click', ()=>stopSession(false));
+  el('resetBtn').addEventListener('click', resetSession);
+
+  // init
+  setGauge(0);
+</script>
+</body>
+</html>
